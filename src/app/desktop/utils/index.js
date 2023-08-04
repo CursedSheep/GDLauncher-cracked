@@ -588,6 +588,12 @@ export const getJVMArguments112 = (
       if (val != null) {
         mcArgs[i] = val;
       }
+      
+      if(typeof args[i] === 'undefined' || args[i] === null)
+      {
+        args[i] = "";
+      }
+
       if (typeof args[i] === 'string' && !needsQuote) {
         args[i] = args[i].replaceAll('"', '');
       }
@@ -717,6 +723,12 @@ export const getJVMArguments113 = (
           args[i] = val;
         }
       }
+
+      if(typeof args[i] === 'undefined' || args[i] === null)
+      {
+        args[i] = "";
+      }
+
       if (!needsQuote) args[i] = args[i].replaceAll('"', '');
     }
   }

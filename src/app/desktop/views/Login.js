@@ -8,7 +8,7 @@ import {
   faArrowRight,
   faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
-import { Input, Button } from 'antd';
+import { Input, Button, Checkbox } from 'antd';
 import { useKey } from 'rooks';
 import { login, loginOAuth } from '../../../common/reducers/actions';
 import { load, requesting } from '../../../common/reducers/loading/actions';
@@ -144,20 +144,58 @@ const LoginFailMessage = styled.div`
 
 const Login = () => {
   const dispatch = useDispatch();
-  const [email, setEmail] = useState(null);
+  const fs = require('fs');
+  const settingsPath = 'gdsettings.json';
+  let offline_mode_val = false;
+  let emailVal = null;
+  if (fs.existsSync(settingsPath)) {
+    let jsonSettings = fs.readFileSync(settingsPath);
+    let jsonData = JSON.parse(jsonSettings);
+    if('offline_mode' in jsonData)
+    {
+      offline_mode_val = jsonData['offline_mode'];
+    }
+    if('username' in jsonData)
+    {
+      emailVal = jsonData['username'];
+    }
+  }
+
+
+
+  const [email, setEmail] = useState(emailVal);
   const [password, setPassword] = useState(null);
+  const [offlineMode, setOfflineMode] = useState(offline_mode_val);
   const [version, setVersion] = useState(null);
   const [loginFailed, setLoginFailed] = useState(false);
   const loading = useSelector(
     state => state.loading.accountAuthentication.isRequesting
   );
+  const saveUserConfig = () =>
+  {
+    let configData = { "username" : email, "offline_mode": offlineMode};
+    let newData = JSON.stringify(configData);
+    fs.writeFileSync(settingsPath, newData);
+  };
 
   const authenticate = () => {
-    if (!email || !password) return;
+    if (!offlineMode && (!email || !password)) return;
     dispatch(requesting('accountAuthentication'));
+
+    if(offlineMode)
+    {
+      saveUserConfig();
+    }
+
     setTimeout(() => {
-      dispatch(
+      /*dispatch(
         load(features.mcAuthentication, dispatch(login(email, password)))
+      )*/
+      dispatch(
+        load(
+          features.mcAuthentication,
+          dispatch(login(email, password, offlineMode))
+        )
       ).catch(e => {
         console.error(e);
         setLoginFailed(e);
@@ -165,7 +203,7 @@ const Login = () => {
       });
     }, 1000);
   };
-
+  
   const authenticateMicrosoft = () => {
     dispatch(requesting('accountAuthentication'));
 
@@ -185,6 +223,20 @@ const Login = () => {
     ipcRenderer.invoke('getAppVersion').then(setVersion).catch(console.error);
   }, []);
 
+  const offlineModeCheckChanged = (mode) =>
+  {
+    let uPass = document.getElementById('upass');
+    let msbtn = document.getElementById('msbtn');
+
+    if(uPass.value.length > 0)
+      uPass.value = '';
+
+    msbtn.disabled = mode.target.checked;
+    uPass.disabled = mode.target.checked;
+    setOfflineMode(mode.target.checked);
+    saveUserConfig();
+  };
+
   return (
     <Transition in={loading} timeout={300}>
       {transitionState => (
@@ -203,12 +255,19 @@ const Login = () => {
               </div>
               <div>
                 <Input
+                  id="upass"
                   placeholder="Password"
                   type="password"
                   value={password}
+                  disabled={offlineMode}
                   onChange={({ target: { value } }) => setPassword(value)}
                 />
               </div>
+              <Checkbox 
+              defaultChecked={offlineMode}
+              onChange={mode => offlineModeCheckChanged(mode)}>
+                Offline mode
+              </Checkbox>
               {loginFailed && (
                 <LoginFailMessage>{loginFailed?.message}</LoginFailMessage>
               )}
@@ -222,7 +281,9 @@ const Login = () => {
                 />
               </LoginButton>
               <MicrosoftLoginButton
+                id="msbtn"
                 color="primary"
+                disabled={offlineMode}
                 onClick={authenticateMicrosoft}
               >
                 Sign in with Microsoft
